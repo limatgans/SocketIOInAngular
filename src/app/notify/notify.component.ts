@@ -1,6 +1,9 @@
 import { Component, OnInit } from '@angular/core';
 import * as socClient from "socket.io-client";
-import * as socServer from "socket.io";
+import { NotifyServiceService } from '../notify-service.service';
+import { HttpClient } from '@angular/common/http';
+
+// import * as socServer from "socket.io";
 
 @Component({
   selector: 'app-notify',
@@ -8,42 +11,76 @@ import * as socServer from "socket.io";
   styleUrls: ['./notify.component.css']
 })
 export class NotifyComponent implements OnInit {
-  socket = io();
+  socket = socClient(); //io.connect();
 
-  public notifications = [
-    {
-      title: "First Notification",
-      message: "Random Post"
-    },
-    {
-      title: "2nd Notification",
-      message: "Another Random Post"
-    },
-    {
-      title: "3rd Notification",
-      message: "3rd is a charm"
-    }
-  ];
+  public notifications = [];
 
-  constructor() { }
+  constructor(private http: HttpClient, private service: NotifyServiceService) { }
 
   ngOnInit() {
+    this.socket.io.uri = "http://localhost:3000";
+    this.socket.io.connect();
+    this.getNotifications();
     this.notify();
   }
 
   notify() {
-    this.socket.on('new message', ({message, title}) => {
-      console.log("Type of Data", typeof message, typeof title);
-      this.addNotification({message, title});
+    console.log("socket", this.socket);
+    this.socket.on('new message', ({ message, title }) => {
+      this.addNotification({ message, title });
     });
+  }
+
+  sendNotification(data) {
+    console.log("Inside Send Notification", Notification.permission);
+    if (!("Notification" in window)) {
+      console.log("This browser does not support desktop notification");
+      return;
+    }
+
+    const options = {
+      body: data.message,
+      requireInteraction: false,
+    };
+    
+    if (Notification.permission === 'granted') {
+      console.log("Permission Granted");
+      let notification = new Notification(data.title, options);
+      return;
+    }
+    
+    if (Notification.permission !== 'denied') {
+      Notification.requestPermission((permission) => {
+        console.log("request Permission", permission);
+        if (permission === "granted") {
+          console.log("Permission Granted");
+          let notification = new Notification("New Message " + data.title + "\n" + data.message);
+          return;
+        }
+        console.log("Permission Denied");
+        return;
+      });
+    }
+
   }
 
   addNotification(data) {
     this.notifications.unshift(data);
+    this.sendNotification(data);
+  }
+
+  
+  getNotifications() {
+
+    this.service.getNotifications().subscribe(res => {
+      console.dir(res);
+      this.notifications = res;
+      console.log('GOT THE NOTIFICATIONS');
+    });
+
   }
 
 }
-
 
 // Examples from 
 /*
